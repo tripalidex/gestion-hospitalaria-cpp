@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <functional>
 #include <iomanip>
+#include <queue>
 
 using namespace std;
 
@@ -298,6 +299,98 @@ void cancelarCita()
     }
 }
 
+// A. Grafo para rutas 
+vector<vector<int>> grafoAmbulancia;
+
+// B. Construcción de grafo de ejemplo 
+void cargarGrafoAmbulancia()
+{
+    // 6 nodos (hospitales - avenidas - zonas)
+    grafoAmbulancia = {
+        {1, 2},
+        {0, 3},
+        {0, 3, 4},
+        {1, 2, 5},
+        {2, 5},
+        {3, 4}
+    };
+    cout << "\n[INFO] Grafo de rutas de ambulancia cargado." << endl;
+}
+
+
+// C. BFS para ruta más corta
+vector<int> bfsRuta(int inicio, int destino)
+{
+    vector<int> padre(6, -1);
+    vector<bool> visitado(6, false);
+
+    queue<int> q;
+    q.push(inicio);
+    visitado[inicio] = true;
+
+    while (!q.empty())
+    {
+        int nodo = q.front();
+        q.pop();
+
+        if (nodo == destino)
+            break;
+
+        for (int vecino : grafoAmbulancia[nodo])
+        {
+            if (!visitado[vecino])
+            {
+                visitado[vecino] = true;
+                padre[vecino] = nodo;
+                q.push(vecino);
+            }
+        }
+    }
+
+    vector<int> ruta;
+    int nodo = destino;
+    while (nodo != -1)
+    {
+        ruta.push_back(nodo);
+        nodo = padre[nodo];
+    }
+
+    reverse(ruta.begin(), ruta.end());
+
+    return ruta;
+}
+
+
+// D. Función principal de optimización
+void optimizarRutaAmbulancia()
+{
+    int inicio, destino;
+    cout << "\n[OPTIMIZAR RUTA] Nodo inicio: ";
+    cin >> inicio;
+    cout << "[OPTIMIZAR RUTA] Nodo destino: ";
+    cin >> destino;
+
+    // Validación de nodos dentro del rango permitido
+    if (inicio < 0 || inicio >= grafoAmbulancia.size() ||
+        destino < 0 || destino >= grafoAmbulancia.size())
+    {
+        cout << "\n[ERROR] Los nodos deben estar entre 0 y "
+             << grafoAmbulancia.size() - 1 << ".\n";
+        return; // evitamos ejecutar BFS con nodos inválidos
+    }
+
+    vector<int> ruta = bfsRuta(inicio, destino);
+
+    cout << "\nRUTA OPTIMA DE AMBULANCIA: ";
+    for (int nodo : ruta)
+        cout << nodo << " ";
+
+    cout << endl;
+}
+
+
+
+
 // --- 5. FUNCIÓN MAIN INTERACTIVA ---
 
 void mostrarMenu()
@@ -309,6 +402,7 @@ void mostrarMenu()
     cout << "2. Cancelar Cita (Actualizar Agenda y Reasignar - RF01.3)" << endl;
     cout << "3. Modificar Disponibilidad de Medico (Hashing - RF01.5)" << endl;
     cout << "4. Mostrar Citas Programadas" << endl;
+    cout << "5. Optimizar Ruta de Ambulancia" << endl;
     cout << "0. Salir" << endl;
     cout << "Ingrese su opcion: ";
 }
@@ -318,6 +412,10 @@ int main()
     cargarDatos(); // (Inicio -> Cargar datos)
     // 2. Ejecutar el procesamiento inicial (Ordenamiento/Fusion) automaticamente
     // Se pide al usuario la decision de si vienen de multiples areas
+    
+    // E. Carga el grafo base de rutas para ambulancias
+    cargarGrafoAmbulancia();
+
     int tipo_procesamiento;
     cout << "\n[CONFIGURACION INICIAL]" << endl;
     cout << "Las citas provienen de multiples areas? (1: Si [Merge Sort], 0: No [Quick Sort]): ";
@@ -366,6 +464,9 @@ int main()
                      << setw(15) << "Prioridad:" << setw(3) << cita.prioridad
                      << setw(10) << "Estado:" << estado << endl;
             }
+            break;
+        case 5:
+            optimizarRutaAmbulancia();
             break;
         case 0:
             cout << "\nSaliendo del Modulo de Gestion de Citas." << endl;
