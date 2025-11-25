@@ -302,90 +302,487 @@ void cancelarCita()
 
 // --- 4B. OPTIMIZACIÓN DE RUTA DE AMBULANCIA (GRAFO + BFS) ---
 
-// A. Grafo para rutas
-vector<vector<int>> grafoAmbulancia;
+struct AristaAmbulancia
+{
+    int u;     // nodo origen
+    int v;     // nodo destino
+    int peso;  // tiempo estimado (minutos). Puede ser negativo como penalización.
+};
 
-// B. Construcción de grafo de ejemplo
+int numNodosAmbulancia = 0;
+vector<AristaAmbulancia> aristasAmbulancia;
+
+// Modelo simple de ambulancias y emergencias
+struct Ambulancia
+{
+    int idAmbulancia;
+    int nodoActual;
+    bool disponible;
+};
+
+struct EmergenciaRuta
+{
+    int idEmergencia;
+    int nodoDestino;
+    bool atendida;
+    int idAmbulanciaAsignada;
+    vector<int> ruta;
+    int tiempoEstimado; // en minutos
+};
+
+vector<Ambulancia> ambulancias;
+vector<EmergenciaRuta> emergencias;
+int contadorEmergencias = 1;
+
+const int INF_TIEMPO = 1000000000;
+
+// Inicializa grafo urbano ponderado y ambulancias de ejemplo
 void cargarGrafoAmbulancia()
 {
-    // 6 nodos (hospitales - avenidas - zonas)
-    grafoAmbulancia = {
-        {1, 2},
-        {0, 3},
-        {0, 3, 4},
-        {1, 2, 5},
-        {2, 5},
-        {3, 4} };
-    cout << "\n[INFO] Grafo de rutas de ambulancia cargado." << endl;
+    // Modelo urbano simple de 6 nodos
+    // 0: Hospital Central
+    // 1: Cruce Norte
+    // 2: Cruce Sur
+    // 3: Avenida Rapida
+    // 4: Zona Residencial
+    // 5: Zona Industrial
+    numNodosAmbulancia = 6;
+
+    aristasAmbulancia.clear();
+
+    auto addEdge = [](int u, int v, int peso)
+    {
+        aristasAmbulancia.push_back({u, v, peso});
+        aristasAmbulancia.push_back({v, u, peso}); // grafo no dirigido: se agrega en ambos sentidos
+    };
+
+    addEdge(0, 1, 5);   // Hospital -> Cruce Norte (5 min)
+    addEdge(0, 2, 7);   // Hospital -> Cruce Sur (7 min)
+    addEdge(1, 3, 3);   // Cruce Norte -> Av. Rapida (3 min)
+    addEdge(2, 3, 2);   // Cruce Sur -> Av. Rapida (2 min)
+    addEdge(3, 4, 6);   // Av. Rapida -> Zona Residencial (6 min)
+    addEdge(3, 5, 4);   // Av. Rapida -> Zona Industrial (4 min)
+    addEdge(4, 5, 5);   // Residencial <-> Industrial
+
+    // Ambulancias disponibles en diferentes nodos de la ciudad
+    ambulancias.clear();
+    ambulancias.push_back({1, 0, true}); // Ambulancia 1 en Hospital Central
+    ambulancias.push_back({2, 1, true}); // Ambulancia 2 en Cruce Norte
+    ambulancias.push_back({3, 5, true}); // Ambulancia 3 en Zona Industrial
+
+    cout << "\n[INFO] Grafo urbano ponderado de ambulancias cargado." << endl;
 }
 
-// C. BFS para ruta más corta
-vector<int> bfsRuta(int inicio, int destino)
+// Bellman-Ford: calcula distancias minimas desde un origen a todos los nodos
+bool bellmanFord(int origen, vector<int>& dist, vector<int>& padre)
 {
-    vector<int> padre(6, -1);
-    vector<bool> visitado(6, false);
+    dist.assign(numNodosAmbulancia, INF_TIEMPO);
+    padre.assign(numNodosAmbulancia, -1);
+    dist[origen] = 0;
 
-    queue<int> q;
-    q.push(inicio);
-    visitado[inicio] = true;
-
-    while (!q.empty())
+    // Relajaciones
+    for (int i = 0; i < numNodosAmbulancia - 1; ++i)
     {
-        int nodo = q.front();
-        q.pop();
-
-        if (nodo == destino)
-            break;
-
-        for (int vecino : grafoAmbulancia[nodo])
+        bool cambio = false;
+        for (const auto& e : aristasAmbulancia)
         {
-            if (!visitado[vecino])
+            if (dist[e.u] == INF_TIEMPO)
+                continue;
+            if (dist[e.u] + e.peso < dist[e.v])
             {
-                visitado[vecino] = true;
-                padre[vecino] = nodo;
-                q.push(vecino);
+                dist[e.v] = dist[e.u] + e.peso;
+                padre[e.v] = e.u;
+                cambio = true;
             }
         }
+        if (!cambio)
+            break;
     }
 
+    // Detección simple de ciclos negativos (no deberian existir en este modelo)
+    for (const auto& e : aristasAmbulancia)
+    {
+        if (dist[e.u] == INF_TIEMPO)
+            continue;
+        if (dist[e.u] + e.peso < dist[e.v])
+        {
+            cout << "[ALERTA] Se detecto un posible ciclo negativo en el mapa urbano.\n";
+            return false;
+        }
+    }
+    return true;
+}
+
+// Construye la ruta desde origen a destino usando el vector padre
+vector<int> reconstruirRuta(int origen, int destino, const vector<int>& padre)
+{
     vector<int> ruta;
     int nodo = destino;
     while (nodo != -1)
     {
         ruta.push_back(nodo);
+        if (nodo == origen)
+            break;
         nodo = padre[nodo];
     }
-
+    if (ruta.back() != origen)
+    {
+        ruta.clear(); // no hay ruta posible
+        return ruta;
+    }
     reverse(ruta.begin(), ruta.end());
-
     return ruta;
 }
 
-// D. Función principal de optimización
-void optimizarRutaAmbulancia()
+// Actualizar peso de una calle (para simular trafico, desvio, bloqueo, etc.)
+void actualizarPesoArista(int u, int v, int nuevoPeso)
 {
-    int inicio, destino;
-    cout << "\n[OPTIMIZAR RUTA] Nodo inicio: ";
-    cin >> inicio;
-    cout << "[OPTIMIZAR RUTA] Nodo destino: ";
-    cin >> destino;
-
-    // Validación de nodos dentro del rango permitido
-    if (inicio < 0 || inicio >= grafoAmbulancia.size() ||
-        destino < 0 || destino >= grafoAmbulancia.size())
+    bool encontrado = false;
+    for (auto& e : aristasAmbulancia)
     {
-        cout << "\n[ERROR] Los nodos deben estar entre 0 y "
-            << grafoAmbulancia.size() - 1 << ".\n";
-        return; // evitamos ejecutar BFS con nodos inválidos
+        if ((e.u == u && e.v == v) || (e.u == v && e.v == u))
+        {
+            e.peso = nuevoPeso;
+            encontrado = true;
+        }
+    }
+    if (encontrado)
+        cout << "[INFO] Peso de la arista (" << u << "," << v << ") actualizado a " << nuevoPeso << " minutos.\n";
+    else
+        cout << "[ADVERTENCIA] No se encontro una via entre " << u << " y " << v << ".\n";
+}
+
+// Registrar una nueva emergencia en el sistema
+void registrarEmergencia()
+{
+    int nodo;
+    cout << "\n[EMERGENCIA] Ingrese nodo de la emergencia (0-" << (numNodosAmbulancia - 1) << "): ";
+    cin >> nodo;
+
+    if (nodo < 0 || nodo >= numNodosAmbulancia)
+    {
+        cout << "[ERROR] Nodo fuera de rango.\n";
+        return;
     }
 
-    vector<int> ruta = bfsRuta(inicio, destino);
+    EmergenciaRuta e;
+    e.idEmergencia = contadorEmergencias++;
+    e.nodoDestino = nodo;
+    e.atendida = false;
+    e.idAmbulanciaAsignada = -1;
+    e.tiempoEstimado = INF_TIEMPO;
 
-    cout << "\nRUTA OPTIMA DE AMBULANCIA: ";
-    for (int nodo : ruta)
+    emergencias.push_back(e);
+
+    cout << "[INFO] Emergencia #" << e.idEmergencia
+         << " registrada en nodo " << e.nodoDestino << ".\n";
+}
+
+// Asignar la ambulancia mas cercana a una emergencia especifica
+void asignarAmbulanciaMasCercana(int idEmergencia)
+{
+    if (emergencias.empty())
+    {
+        cout << "[INFO] No hay emergencias registradas.\n";
+        return;
+    }
+
+    EmergenciaRuta* objetivo = nullptr;
+    for (auto& e : emergencias)
+    {
+        if (e.idEmergencia == idEmergencia)
+        {
+            objetivo = &e;
+            break;
+        }
+    }
+
+    if (!objetivo)
+    {
+        cout << "[ERROR] Emergencia con ID " << idEmergencia << " no encontrada.\n";
+        return;
+    }
+    if (objetivo->atendida)
+    {
+        cout << "[INFO] La emergencia #" << idEmergencia << " ya fue atendida.\n";
+        return;
+    }
+
+    int mejorTiempo = INF_TIEMPO;
+    int idxMejorAmb = -1;
+    vector<int> mejorRuta;
+
+    for (size_t i = 0; i < ambulancias.size(); ++i)
+    {
+        if (!ambulancias[i].disponible)
+            continue;
+
+        vector<int> dist, padre;
+        if (!bellmanFord(ambulancias[i].nodoActual, dist, padre))
+        {
+            cout << "[ERROR] No se pudo ejecutar Bellman-Ford para la ambulancia " << ambulancias[i].idAmbulancia << ".\n";
+            continue;
+        }
+
+        if (dist[objetivo->nodoDestino] < mejorTiempo)
+        {
+            vector<int> rutaCandidata = reconstruirRuta(ambulancias[i].nodoActual,
+                                                        objetivo->nodoDestino, padre);
+            if (!rutaCandidata.empty())
+            {
+                mejorTiempo = dist[objetivo->nodoDestino];
+                idxMejorAmb = static_cast<int>(i);
+                mejorRuta = rutaCandidata;
+            }
+        }
+    }
+
+    if (idxMejorAmb == -1)
+    {
+        cout << "[ALERTA] No hay ambulancias disponibles para esta emergencia.\n";
+        return;
+    }
+
+    // Asignacion final
+    objetivo->atendida = true;
+    objetivo->idAmbulanciaAsignada = ambulancias[idxMejorAmb].idAmbulancia;
+    objetivo->ruta = mejorRuta;
+    objetivo->tiempoEstimado = mejorTiempo;
+    ambulancias[idxMejorAmb].disponible = false;
+
+    cout << "\n[ASIGNACION] Emergencia #" << objetivo->idEmergencia
+         << " atendida por Ambulancia #" << objetivo->idAmbulanciaAsignada << ".\n";
+    cout << "Ruta optima: ";
+    for (int nodo : objetivo->ruta)
         cout << nodo << " ";
+    cout << "\nTiempo estimado de llegada: " << objetivo->tiempoEstimado << " minutos.\n";
+}
 
-    cout << endl;
+// Asignar ambulancias a todas las emergencias pendientes (emergencias simultaneas)
+void asignarEmergenciasSimultaneas()
+{
+    if (emergencias.empty())
+    {
+        cout << "[INFO] No hay emergencias registradas.\n";
+        return;
+    }
+
+    cout << "\n[EMERGENCIAS] Asignando ambulancias a todas las emergencias pendientes...\n";
+
+    bool huboAsignaciones = false;
+
+    // Estrategia greedy: siempre buscar la mejor ambulancia para cada emergencia pendiente
+    for (auto& e : emergencias)
+    {
+        if (e.atendida)
+            continue;
+
+        int mejorTiempo = INF_TIEMPO;
+        int idxMejorAmb = -1;
+        vector<int> mejorRuta;
+
+        for (size_t i = 0; i < ambulancias.size(); ++i)
+        {
+            if (!ambulancias[i].disponible)
+                continue;
+
+            vector<int> dist, padre;
+            if (!bellmanFord(ambulancias[i].nodoActual, dist, padre))
+                continue;
+
+            if (dist[e.nodoDestino] < mejorTiempo)
+            {
+                vector<int> rutaCandidata = reconstruirRuta(ambulancias[i].nodoActual,
+                                                            e.nodoDestino, padre);
+                if (!rutaCandidata.empty())
+                {
+                    mejorTiempo = dist[e.nodoDestino];
+                    idxMejorAmb = static_cast<int>(i);
+                    mejorRuta = rutaCandidata;
+                }
+            }
+        }
+
+        if (idxMejorAmb != -1)
+        {
+            e.atendida = true;
+            e.idAmbulanciaAsignada = ambulancias[idxMejorAmb].idAmbulancia;
+            e.ruta = mejorRuta;
+            e.tiempoEstimado = mejorTiempo;
+            ambulancias[idxMejorAmb].disponible = false;
+            huboAsignaciones = true;
+
+            cout << "[ASIGNACION] Emergencia #" << e.idEmergencia
+                 << " -> Ambulancia #" << e.idAmbulanciaAsignada
+                 << " (ETA: " << e.tiempoEstimado << " min)\n";
+        }
+    }
+
+    if (!huboAsignaciones)
+        cout << "[INFO] No se pudo asignar ninguna ambulancia (todas ocupadas o sin ruta).\n";
+}
+
+// Permite actualizar el trafico y recalcular la ruta de una emergencia ya asignada
+void actualizarTraficoYRecalcular()
+{
+    if (emergencias.empty())
+    {
+        cout << "[INFO] No hay emergencias registradas.\n";
+        return;
+    }
+
+    int u, v, nuevoPeso;
+    cout << "\n[TRAFICO] Actualizar peso de una via.\n";
+    cout << "Nodo origen: ";
+    cin >> u;
+    cout << "Nodo destino: ";
+    cin >> v;
+    cout << "Nuevo tiempo estimado (minutos, puede ser negativo como penalizacion): ";
+    cin >> nuevoPeso;
+
+    actualizarPesoArista(u, v, nuevoPeso);
+
+    int idEmerg;
+    cout << "\n[RECALCULO] Ingrese ID de la emergencia a recalcular: ";
+    cin >> idEmerg;
+
+    EmergenciaRuta* e = nullptr;
+    for (auto& em : emergencias)
+    {
+        if (em.idEmergencia == idEmerg)
+        {
+            e = &em;
+            break;
+        }
+    }
+
+    if (!e)
+    {
+        cout << "[ERROR] Emergencia no encontrada.\n";
+        return;
+    }
+
+    if (e->idAmbulanciaAsignada == -1)
+    {
+        cout << "[INFO] La emergencia seleccionada aun no tiene ambulancia asignada.\n";
+        return;
+    }
+
+    // Buscamos la ambulancia que tiene ese ID
+    Ambulancia* amb = nullptr;
+    for (auto& a : ambulancias)
+    {
+        if (a.idAmbulancia == e->idAmbulanciaAsignada)
+        {
+            amb = &a;
+            break;
+        }
+    }
+
+    if (!amb)
+    {
+        cout << "[ERROR] No se encontro la ambulancia asignada.\n";
+        return;
+    }
+
+    vector<int> dist, padre;
+    if (!bellmanFord(amb->nodoActual, dist, padre))
+    {
+        cout << "[ERROR] No se pudo recalcular la ruta.\n";
+        return;
+    }
+
+    vector<int> nuevaRuta = reconstruirRuta(amb->nodoActual, e->nodoDestino, padre);
+    if (nuevaRuta.empty())
+    {
+        cout << "[ALERTA] Tras el cambio de trafico ya no existe ruta valida hacia la emergencia.\n";
+        return;
+    }
+
+    e->ruta = nuevaRuta;
+    e->tiempoEstimado = dist[e->nodoDestino];
+
+    cout << "\n[NUEVA RUTA] Emergencia #" << e->idEmergencia
+         << " atendida por Ambulancia #" << e->idAmbulanciaAsignada << ".\n";
+    cout << "Ruta recalculada: ";
+    for (int nodo : e->ruta)
+        cout << nodo << " ";
+    cout << "\nNuevo tiempo estimado de llegada: " << e->tiempoEstimado << " minutos.\n";
+}
+
+// Mostrar resumen de emergencias registradas y tiempos estimados
+void mostrarResumenEmergencias()
+{
+    if (emergencias.empty())
+    {
+        cout << "\n[INFO] No hay emergencias registradas.\n";
+        return;
+    }
+
+    cout << "\n========== RESUMEN DE EMERGENCIAS ==========\n";
+    for (const auto& e : emergencias)
+    {
+        cout << "Emergencia #" << e.idEmergencia
+             << " | Nodo: " << e.nodoDestino
+             << " | Estado: " << (e.atendida ? "ATENDIDA" : "PENDIENTE");
+
+        if (e.atendida)
+        {
+            cout << " | Ambulancia #" << e.idAmbulanciaAsignada
+                 << " | ETA: " << e.tiempoEstimado << " min";
+        }
+        cout << "\n";
+    }
+    cout << "===========================================\n";
+}
+
+// Sub-menu principal del modulo de rutas de ambulancia
+void optimizarRutaAmbulancia()
+{
+    int opcion = -1;
+    do
+    {
+        cout << "\n---------------- MODULO DE RUTAS DE AMBULANCIAS ----------------\n";
+        cout << "1. Registrar nueva emergencia\n";
+        cout << "2. Asignar ambulancia mas cercana a una emergencia\n";
+        cout << "3. Asignar ambulancias a todas las emergencias pendientes\n";
+        cout << "4. Actualizar trafico y recalcular ruta de una emergencia\n";
+        cout << "5. Ver resumen de emergencias y tiempos estimados\n";
+        cout << "0. Volver al menu principal\n";
+        cout << "Seleccione una opcion: ";
+        cin >> opcion;
+
+        switch (opcion)
+        {
+        case 1:
+            registrarEmergencia();
+            break;
+        case 2:
+        {
+            int id;
+            cout << "Ingrese ID de la emergencia a asignar: ";
+            cin >> id;
+            asignarAmbulanciaMasCercana(id);
+            break;
+        }
+        case 3:
+            asignarEmergenciasSimultaneas();
+            break;
+        case 4:
+            actualizarTraficoYRecalcular();
+            break;
+        case 5:
+            mostrarResumenEmergencias();
+            break;
+        case 0:
+            cout << "[INFO] Volviendo al menu principal...\n";
+            break;
+        default:
+            cout << "[ERROR] Opcion no valida en modulo de ambulancias.\n";
+            break;
+        }
+
+    } while (opcion != 0);
 }
 
 // --- 6. ASIGNACIÓN DE RECURSOS HOSPITALARIOS (GREEDY + SKEW HEAP) ---
