@@ -6,6 +6,7 @@
 #include <functional>
 #include <iomanip>
 #include <queue>
+#include <map> // Para inventario de medicamentos
 
 using namespace std;
 
@@ -45,7 +46,7 @@ struct Cita
 
 // --- 2. DATOS GLOBALES Y HASHING ---
 
-// Tablas Hash (unordered_map) para búsqueda O(1) promedio [cite: 47]
+// Tablas Hash (unordered_map) para búsqueda O(1) promedio
 unordered_map<string, Paciente> tablaPacientes; // Clave: DNI
 unordered_map<string, Medico> tablaMedicos;     // Clave: nombreCompleto
 
@@ -54,26 +55,26 @@ vector<Cita> citasProgramadas;
 vector<Cita> listaEspera;
 
 // Tipo de alias para el comparador de ordenamiento
-using CitaComparator = function<bool(const Cita &, const Cita &)>;
+using CitaComparator = function<bool(const Cita&, const Cita&)>;
 
 // Comparador Global: Prioridad (menor es más urgente) > Fecha > Hora (RF01.1)
-CitaComparator globalComparator = [](const Cita &a, const Cita &b)
-{
-    if (a.prioridad != b.prioridad)
+CitaComparator globalComparator = [](const Cita& a, const Cita& b)
     {
-        return a.prioridad < b.prioridad;
-    }
-    if (a.fecha != b.fecha)
-    {
-        return a.fecha < b.fecha;
-    }
-    return a.hora < b.hora;
-};
+        if (a.prioridad != b.prioridad)
+        {
+            return a.prioridad < b.prioridad;
+        }
+        if (a.fecha != b.fecha)
+        {
+            return a.fecha < b.fecha;
+        }
+        return a.hora < b.hora;
+    };
 
 // --- 3. ALGORITMOS DE ORDENAMIENTO (Quick Sort y Merge Sort) ---
 
 // Implementación de Partición (Necesaria para Quick Sort)
-int particion(vector<Cita> &arr, int low, int high, const CitaComparator &comp)
+int particion(vector<Cita>& arr, int low, int high, const CitaComparator& comp)
 {
     Cita pivot = arr[high];
     int i = (low - 1);
@@ -90,10 +91,10 @@ int particion(vector<Cita> &arr, int low, int high, const CitaComparator &comp)
 }
 
 /**
- * Quick Sort: Ordenamiento rápido, útil para ordenar citas por fecha o prioridad[cite: 45].
- * Complejidad: O(n log n) promedio (RNF01.1).
+ * Quick Sort: Ordenamiento rápido, útil para ordenar citas por fecha o prioridad.
+ * Complejidad: O(n log n) promedio.
  */
-void quickSort(vector<Cita> &arr, int low, int high, const CitaComparator &comp)
+void quickSort(vector<Cita>& arr, int low, int high, const CitaComparator& comp)
 {
     if (low < high)
     {
@@ -104,7 +105,7 @@ void quickSort(vector<Cita> &arr, int low, int high, const CitaComparator &comp)
 }
 
 // Implementación de Merge (Necesaria para Merge Sort)
-void merge(vector<Cita> &arr, int l, int m, int r, const CitaComparator &comp)
+void merge(vector<Cita>& arr, int l, int m, int r, const CitaComparator& comp)
 {
     int n1 = m - l + 1;
     int n2 = r - m;
@@ -138,9 +139,9 @@ void merge(vector<Cita> &arr, int l, int m, int r, const CitaComparator &comp)
 }
 
 /**
- * Merge Sort: Ordenamiento estable, ideal para consolidar citas de múltiples clínicas[cite: 46].
+ * Merge Sort: Ordenamiento estable, ideal para consolidar citas de múltiples clínicas.
  */
-void mergeSort(vector<Cita> &arr, int l, int r, const CitaComparator &comp)
+void mergeSort(vector<Cita>& arr, int l, int r, const CitaComparator& comp)
 {
     if (l >= r)
         return;
@@ -158,18 +159,18 @@ void mergeSort(vector<Cita> &arr, int l, int r, const CitaComparator &comp)
 void cargarDatos()
 {
     // Simulación de carga de pacientes (Hashing)
-    tablaPacientes["23127181"] = {101, "23127181", "Carlos Quispe"};
-    tablaPacientes["21200622"] = {102, "21200622", "Moises Sacsara"};
+    tablaPacientes["23127181"] = { 101, "23127181", "Carlos Quispe" };
+    tablaPacientes["21200622"] = { 102, "21200622", "Moises Sacsara" };
 
     // Simulación de carga de médicos (Hashing)
-    tablaMedicos["Dioses Zarate"] = {501, "Dioses Zarate", "Cardiología", true};
-    tablaMedicos["Terrel Santos"] = {502, "Terrel Santos", "Pediatría", true};
+    tablaMedicos["Dioses Zarate"] = { 501, "Dioses Zarate", "Cardiología", true };
+    tablaMedicos["Terrel Santos"] = { 502, "Terrel Santos", "Pediatría", true };
 
     // Simulación de carga de citas
     citasProgramadas = {
         {1, 101, 501, "23127181", "Dioses Zarate", "2025-12-01", "10:00", "Cardiología", 2},
         {2, 102, 502, "21200622", "Terrel Santos", "2025-12-01", "09:00", "Pediatría", 1},
-        {3, 101, 501, "23127181", "Dioses Zarate", "2025-12-02", "08:00", "Cardiología", 3}};
+        {3, 101, 501, "23127181", "Dioses Zarate", "2025-12-02", "08:00", "Cardiología", 3} };
     listaEspera = {
         {4, 999, 0, "33445566", "N/A", "N/A", "N/A", "Medicina General", 1} // Prioridad Alta (1)
     };
@@ -185,13 +186,13 @@ void iniciarProcesamiento(bool multiplesAreas)
     if (multiplesAreas)
     { // Diagrama: No -> Fusionar todas las listas de citas
         cout << "[MERGE SORT] Consolidando y ordenando citas de multiples areas (estable)..." << endl;
-        // Se ejecuta Merge Sort para consolidación estable (RF01.4)
+        // Se ejecuta Merge Sort para consolidación estable
         mergeSort(citasProgramadas, 0, citasProgramadas.size() - 1, globalComparator);
     }
     else
     { // Diagrama: Sí -> Ordenar citas
         cout << "[QUICK SORT] Ordenando citas del dia por prioridad y hora (rapido)..." << endl;
-        // Se ejecuta Quick Sort para ordenamiento rápido (RF01.1)
+        // Se ejecuta Quick Sort para ordenamiento rápido
         quickSort(citasProgramadas, 0, citasProgramadas.size() - 1, globalComparator);
     }
     cout << "[INFO] Citas procesadas correctamente." << endl;
@@ -199,7 +200,7 @@ void iniciarProcesamiento(bool multiplesAreas)
 
 /**
  * Buscar paciente (Diagrama: Buscar paciente -> Mostrar datos de paciente)
- * Usa Hashing O(1) promedio (RF01.2)
+ * Usa Hashing O(1) promedio.
  */
 void buscarPacientePorDNI()
 {
@@ -221,7 +222,7 @@ void buscarPacientePorDNI()
 
 /**
  * Modificar disponibilidad (Diagrama: Modificar disponibilidad -> Actualizar estado del médico)
- * Usa Hashing O(1) promedio (RF01.5)
+ * Usa Hashing O(1) promedio.
  */
 void modificarDisponibilidadMedico()
 {
@@ -239,7 +240,7 @@ void modificarDisponibilidadMedico()
     {
         it->second.disponible = (estado == 1);
         cout << "  > EXITO: Disponibilidad de " << nombreMedico
-             << " actualizada a " << (it->second.disponible ? "DISPONIBLE" : "NO DISPONIBLE") << "." << endl;
+            << " actualizada a " << (it->second.disponible ? "DISPONIBLE" : "NO DISPONIBLE") << "." << endl;
     }
     else
     {
@@ -249,7 +250,7 @@ void modificarDisponibilidadMedico()
 
 /**
  * Cancelar cita (Diagrama: Cancelar cita -> Actualizar agenda -> Mostrar cita como cancelada)
- * Incluye Reasignación Automática (RF01.3)
+ * Incluye Reasignación Automática.
  */
 void cancelarCita()
 {
@@ -258,9 +259,9 @@ void cancelarCita()
     if (!(cin >> idCita))
         return;
 
-    Cita *citaCancelada = nullptr;
+    Cita* citaCancelada = nullptr;
     // 1. Actualizar agenda/Mostrar cita como cancelada
-    for (Cita &cita : citasProgramadas)
+    for (Cita& cita : citasProgramadas)
     {
         if (cita.idCita == idCita && !cita.cancelada)
         {
@@ -273,7 +274,7 @@ void cancelarCita()
 
     if (citaCancelada && !listaEspera.empty())
     {
-        // 2. Reasignación automática (RF01.3): Usamos Quick Sort para asegurar la máxima prioridad
+        // 2. Reasignación automática: Usamos Quick Sort para asegurar la máxima prioridad
         quickSort(listaEspera, 0, listaEspera.size() - 1, globalComparator);
 
         Cita pacientePrioritario = listaEspera[0];
@@ -287,7 +288,7 @@ void cancelarCita()
         listaEspera.erase(listaEspera.begin());
 
         cout << "  > REASIGNACIÓN: Cita reasignada a paciente prioritario (DNI: "
-             << citaCancelada->dniPaciente << ") en el slot liberado." << endl;
+            << citaCancelada->dniPaciente << ") en el slot liberado." << endl;
     }
     else if (citaCancelada)
     {
@@ -299,10 +300,12 @@ void cancelarCita()
     }
 }
 
-// A. Grafo para rutas 
+// --- 4B. OPTIMIZACIÓN DE RUTA DE AMBULANCIA (GRAFO + BFS) ---
+
+// A. Grafo para rutas
 vector<vector<int>> grafoAmbulancia;
 
-// B. Construcción de grafo de ejemplo 
+// B. Construcción de grafo de ejemplo
 void cargarGrafoAmbulancia()
 {
     // 6 nodos (hospitales - avenidas - zonas)
@@ -312,11 +315,9 @@ void cargarGrafoAmbulancia()
         {0, 3, 4},
         {1, 2, 5},
         {2, 5},
-        {3, 4}
-    };
+        {3, 4} };
     cout << "\n[INFO] Grafo de rutas de ambulancia cargado." << endl;
 }
-
 
 // C. BFS para ruta más corta
 vector<int> bfsRuta(int inicio, int destino)
@@ -360,7 +361,6 @@ vector<int> bfsRuta(int inicio, int destino)
     return ruta;
 }
 
-
 // D. Función principal de optimización
 void optimizarRutaAmbulancia()
 {
@@ -375,7 +375,7 @@ void optimizarRutaAmbulancia()
         destino < 0 || destino >= grafoAmbulancia.size())
     {
         cout << "\n[ERROR] Los nodos deben estar entre 0 y "
-             << grafoAmbulancia.size() - 1 << ".\n";
+            << grafoAmbulancia.size() - 1 << ".\n";
         return; // evitamos ejecutar BFS con nodos inválidos
     }
 
@@ -388,21 +388,400 @@ void optimizarRutaAmbulancia()
     cout << endl;
 }
 
+// --- 6. ASIGNACIÓN DE RECURSOS HOSPITALARIOS (GREEDY + SKEW HEAP) ---
+
+// Niveles de urgencia ESI 1-5 (1 = más urgente)
+enum class UrgenciaESI
+{
+    ESI1 = 1,
+    ESI2 = 2,
+    ESI3 = 3,
+    ESI4 = 4,
+    ESI5 = 5
+};
+
+// Paciente crítico para asignación de UCI/ventiladores
+struct PacienteCritico
+{
+    int idPaciente;
+    string dni;
+    string nombre;
+    UrgenciaESI urgencia;
+    bool necesitaUCI;
+    bool necesitaVentilador;
+    bool necesitaMedCritica;
+    long long ordenLlegada; // para desempatar por orden de llegada
+};
+
+// Comparador de prioridad: menor ESI -> más prioridad; si empatan, menor ordenLlegada
+bool tieneMayorPrioridad(const PacienteCritico& a, const PacienteCritico& b)
+{
+    if (static_cast<int>(a.urgencia) != static_cast<int>(b.urgencia))
+        return static_cast<int>(a.urgencia) < static_cast<int>(b.urgencia);
+    return a.ordenLlegada < b.ordenLlegada;
+}
+
+// Nodo de Skew Heap
+struct NodoSkew
+{
+    PacienteCritico valor;
+    NodoSkew* izq;
+    NodoSkew* der;
+
+    NodoSkew(const PacienteCritico& p) : valor(p), izq(nullptr), der(nullptr) {}
+};
+
+// Skew Heap para cola de prioridad de pacientes críticos
+class SkewHeapCritico
+{
+private:
+    NodoSkew* raiz;
+
+    static NodoSkew* fusionar(NodoSkew* a, NodoSkew* b)
+    {
+        if (!a)
+            return b;
+        if (!b)
+            return a;
+
+        // El nodo con mayor prioridad (más urgente) debe ir en la raíz
+        if (!tieneMayorPrioridad(a->valor, b->valor))
+        {
+            std::swap(a, b);
+        }
+
+        // Fusión en subárbol derecho
+        a->der = fusionar(a->der, b);
+
+        // Propiedad del skew heap: se intercambian hijos
+        std::swap(a->izq, a->der);
+        return a;
+    }
+
+    static void limpiar(NodoSkew* n)
+    {
+        if (!n)
+            return;
+        limpiar(n->izq);
+        limpiar(n->der);
+        delete n;
+    }
+
+public:
+    SkewHeapCritico() : raiz(nullptr) {}
+
+    ~SkewHeapCritico()
+    {
+        limpiar(raiz);
+    }
+
+    bool estaVacio() const
+    {
+        return raiz == nullptr;
+    }
+
+    const PacienteCritico& obtenerMaxPrioridad() const
+    {
+        return raiz->valor; // se asume que no está vacío
+    }
+
+    void insertar(const PacienteCritico& p)
+    {
+        NodoSkew* n = new NodoSkew(p);
+        raiz = fusionar(raiz, n);
+    }
+
+    void eliminarMaxPrioridad()
+    {
+        if (!raiz)
+            return;
+        NodoSkew* viejaRaiz = raiz;
+        raiz = fusionar(raiz->izq, raiz->der);
+        delete viejaRaiz;
+    }
+};
+
+// Inventario de medicamentos críticos
+struct StockMedicamento
+{
+    string nombre;
+    int cantidad;
+    int umbralMinimo;
+};
+
+class InventarioMedicamentos
+{
+private:
+    map<string, StockMedicamento> inventario;
+
+public:
+    void agregarTipoMedicamento(const string& nombre, int cantidadInicial, int umbralMinimo)
+    {
+        inventario[nombre] = { nombre, cantidadInicial, umbralMinimo };
+    }
+
+    bool consumir(const string& nombre, int cantidad)
+    {
+        auto it = inventario.find(nombre);
+        if (it == inventario.end())
+        {
+            cout << "[ALERTA] Medicamento '" << nombre << "' no registrado.\n";
+            return false;
+        }
+        if (cantidad > it->second.cantidad)
+        {
+            cout << "[ALERTA] Stock insuficiente de '" << nombre
+                << "'. Solicitado: " << cantidad
+                << ", disponible: " << it->second.cantidad << "\n";
+            return false;
+        }
+        it->second.cantidad -= cantidad;
+        if (it->second.cantidad < it->second.umbralMinimo)
+        {
+            cout << "[ALERTA CRITICA] Stock bajo de '" << nombre
+                << "'. Cantidad actual: " << it->second.cantidad << "\n";
+        }
+        return true;
+    }
+
+    void reabastecer(const string& nombre, int cantidad)
+    {
+        auto it = inventario.find(nombre);
+        if (it == inventario.end())
+        {
+            // si no existe, se crea con umbral por defecto
+            inventario[nombre] = { nombre, cantidad, max(1, cantidad / 4) };
+        }
+        else
+        {
+            it->second.cantidad += cantidad;
+        }
+        cout << "[INFO] Nuevo stock de '" << nombre
+            << "': " << inventario[nombre].cantidad << "\n";
+    }
+
+    void reporte() const
+    {
+        cout << "=== INVENTARIO DE MEDICAMENTOS CRITICOS ===\n";
+        for (const auto& kv : inventario)
+        {
+            const auto& m = kv.second;
+            cout << " - " << m.nombre
+                << " | Cant: " << m.cantidad
+                << " | Umbral min: " << m.umbralMinimo << "\n";
+        }
+        cout << "===========================================\n";
+    }
+};
+
+// Gestor de recursos hospitalarios (UCI, ventiladores, meds)
+class GestorRecursosHospitalarios
+{
+private:
+    int totalCamasUCI;
+    int camasOcupadas;
+    int totalVentiladores;
+    int ventiladoresOcupados;
+
+    long long contadorLlegada;
+    SkewHeapCritico colaEspera;
+    InventarioMedicamentos inventario;
+
+public:
+    GestorRecursosHospitalarios(int camasUCI, int ventiladores)
+        : totalCamasUCI(camasUCI),
+        camasOcupadas(0),
+        totalVentiladores(ventiladores),
+        ventiladoresOcupados(0),
+        contadorLlegada(0) {}
+
+    InventarioMedicamentos& obtenerInventario()
+    {
+        return inventario;
+    }
+
+    // Registro interactivo de paciente crítico
+    void registrarPacienteCriticoInteractivo()
+    {
+        string dni;
+        cout << "\n[RECURSOS] Ingrese DNI del paciente critico: ";
+        cin >> dni;
+
+        int idPaciente = -1;
+        string nombre;
+
+        auto it = tablaPacientes.find(dni);
+        if (it != tablaPacientes.end())
+        {
+            idPaciente = it->second.idPaciente;
+            nombre = it->second.nombreCompleto;
+            cout << "  > Paciente encontrado en tabla: " << nombre << " (ID " << idPaciente << ")\n";
+        }
+        else
+        {
+            cout << "  > Paciente no registrado en tabla. Ingrese nombre completo: ";
+            cin.ignore();
+            getline(cin, nombre);
+        }
+
+        int nivelESI;
+        char cUCI, cVent, cMed;
+        cout << "  > Nivel de urgencia ESI (1-5): ";
+        cin >> nivelESI;
+        cout << "  > ¿Necesita cama UCI? (s/n): ";
+        cin >> cUCI;
+        cout << "  > ¿Necesita ventilador? (s/n): ";
+        cin >> cVent;
+        cout << "  > ¿Requiere medicacion critica inmediata? (s/n): ";
+        cin >> cMed;
+
+        UrgenciaESI urg;
+        if (nivelESI <= 1)
+            urg = UrgenciaESI::ESI1;
+        else if (nivelESI == 2)
+            urg = UrgenciaESI::ESI2;
+        else if (nivelESI == 3)
+            urg = UrgenciaESI::ESI3;
+        else if (nivelESI == 4)
+            urg = UrgenciaESI::ESI4;
+        else
+            urg = UrgenciaESI::ESI5;
+
+        PacienteCritico p;
+        p.idPaciente = idPaciente;
+        p.dni = dni;
+        p.nombre = nombre;
+        p.urgencia = urg;
+        p.necesitaUCI = (cUCI == 's' || cUCI == 'S');
+        p.necesitaVentilador = (cVent == 's' || cVent == 'S');
+        p.necesitaMedCritica = (cMed == 's' || cMed == 'S');
+        p.ordenLlegada = contadorLlegada++;
+
+        colaEspera.insertar(p);
+
+        cout << "[INFO] Paciente critico " << p.nombre
+            << " agregado a la cola de asignacion de recursos.\n";
+    }
+
+    // Asignación Greedy: siempre al paciente más urgente mientras haya recursos
+    void asignarRecursosGreedy()
+    {
+        if (colaEspera.estaVacio())
+        {
+            cout << "\n[RECURSOS] No hay pacientes criticos en espera.\n";
+            return;
+        }
+
+        cout << "\n[RECURSOS] Ejecutando asignacion de recursos (Greedy + Skew Heap)...\n";
+
+        while (!colaEspera.estaVacio())
+        {
+            PacienteCritico top = colaEspera.obtenerMaxPrioridad();
+
+            bool puedeUCI = (!top.necesitaUCI) || (camasOcupadas < totalCamasUCI);
+            bool puedeVent = (!top.necesitaVentilador) || (ventiladoresOcupados < totalVentiladores);
+
+            if (!puedeUCI || !puedeVent)
+            {
+                cout << "[INFO] Recursos insuficientes para asignar al siguiente paciente de mayor prioridad.\n";
+                break;
+            }
+
+            cout << "[ASIGNACION] Paciente " << top.nombre << " (DNI: " << top.dni << ")\n";
+            cout << "    - Urgencia ESI: " << static_cast<int>(top.urgencia) << "\n";
+
+            if (top.necesitaUCI)
+            {
+                camasOcupadas++;
+                cout << "    - Cama UCI asignada. (" << camasOcupadas
+                    << "/" << totalCamasUCI << " ocupadas)\n";
+            }
+
+            if (top.necesitaVentilador)
+            {
+                ventiladoresOcupados++;
+                cout << "    - Ventilador asignado. (" << ventiladoresOcupados
+                    << "/" << totalVentiladores << " ocupados)\n";
+            }
+
+            if (top.necesitaMedCritica)
+            {
+                string med = "MedicamentoCriticoA";
+                bool ok = inventario.consumir(med, 1);
+                if (!ok)
+                {
+                    cout << "    [ALERTA] No se pudo dispensar medicacion critica para este paciente.\n";
+                }
+            }
+
+            cout << "---------------------------------------------\n";
+
+            colaEspera.eliminarMaxPrioridad();
+        }
+    }
 
 
+    // Liberar recursos cuando pacientes salen de UCI/ventilador
+    void darAltaPacientesInteractivo()
+    {
+        int liberarCamas, liberarVent;
+        cout << "\n[ALTA PACIENTES] ¿Cuantas camas UCI se liberan?: ";
+        cin >> liberarCamas;
+        cout << "[ALTA PACIENTES] ¿Cuantos ventiladores se liberan?: ";
+        cin >> liberarVent;
+
+        camasOcupadas -= liberarCamas;
+        ventiladoresOcupados -= liberarVent;
+
+        if (camasOcupadas < 0)
+            camasOcupadas = 0;
+        if (ventiladoresOcupados < 0)
+            ventiladoresOcupados = 0;
+
+        cout << "[INFO] Recursos actualizados tras las altas.\n";
+    }
+
+    void reporteRecursos() const
+    {
+        cout << "\n========== ESTADO DE RECURSOS HOSPITALARIOS ==========\n";
+        cout << "Camas UCI: " << camasOcupadas << " / " << totalCamasUCI << "\n";
+        cout << "Ventiladores: " << ventiladoresOcupados << " / " << totalVentiladores << "\n";
+        cout << "======================================================\n";
+        inventario.reporte();
+    }
+
+    void reabastecerMedicamentoInteractivo()
+    {
+        string nombre;
+        int cantidad;
+        cout << "\n[REABASTECER] Nombre del medicamento critico: ";
+        cin >> nombre;
+        cout << "  > Cantidad a agregar: ";
+        cin >> cantidad;
+        inventario.reabastecer(nombre, cantidad);
+    }
+};
+
+// Gestor global de recursos (ejemplo: 10 camas UCI y 6 ventiladores)
+GestorRecursosHospitalarios gestorRecursos(10, 6);
 
 // --- 5. FUNCIÓN MAIN INTERACTIVA ---
 
 void mostrarMenu()
 {
     cout << "\n=========================================================" << endl;
-    cout << "  GESTION DE CITAS MEDICAS" << endl;
+    cout << "  GESTION DE CITAS MEDICAS Y RECURSOS HOSPITALARIOS" << endl;
     cout << "=========================================================" << endl;
     cout << "1. Buscar Paciente (Hashing - RF01.2)" << endl;
     cout << "2. Cancelar Cita (Actualizar Agenda y Reasignar - RF01.3)" << endl;
     cout << "3. Modificar Disponibilidad de Medico (Hashing - RF01.5)" << endl;
     cout << "4. Mostrar Citas Programadas" << endl;
-    cout << "5. Optimizar Ruta de Ambulancia" << endl;
+    cout << "5. Optimizar Ruta de Ambulancia (Grafo + BFS)" << endl;
+    cout << "6. Registrar Paciente Critico (Cola Skew Heap)" << endl;
+    cout << "7. Asignar Recursos (Greedy: UCI/Ventiladores + Meds)" << endl;
+    cout << "8. Dar de Alta Pacientes (Liberar Recursos)" << endl;
+    cout << "9. Ver Reporte de Recursos e Inventario" << endl;
+    cout << "10. Reabastecer Medicamento Critico" << endl;
     cout << "0. Salir" << endl;
     cout << "Ingrese su opcion: ";
 }
@@ -410,12 +789,11 @@ void mostrarMenu()
 int main()
 {
     cargarDatos(); // (Inicio -> Cargar datos)
-    // 2. Ejecutar el procesamiento inicial (Ordenamiento/Fusion) automaticamente
-    // Se pide al usuario la decision de si vienen de multiples areas
-    
-    // E. Carga el grafo base de rutas para ambulancias
+
+    // Carga el grafo base de rutas para ambulancias
     cargarGrafoAmbulancia();
 
+    // Configuracion inicial de procesamiento de citas
     int tipo_procesamiento;
     cout << "\n[CONFIGURACION INICIAL]" << endl;
     cout << "Las citas provienen de multiples areas? (1: Si [Merge Sort], 0: No [Quick Sort]): ";
@@ -427,6 +805,11 @@ int main()
     }
     iniciarProcesamiento(tipo_procesamiento == 1);
 
+    // Configuracion inicial de inventario de medicamentos criticos
+    InventarioMedicamentos& inv = gestorRecursos.obtenerInventario();
+    inv.agregarTipoMedicamento("MedicamentoCriticoA", 5, 2);
+    inv.agregarTipoMedicamento("MedicamentoCriticoB", 10, 3);
+
     int opcion;
     do
     {
@@ -437,39 +820,50 @@ int main()
             break;
         }
 
-        // Ingresar solicitudes del usuario
         switch (opcion)
         {
         case 1:
-            // Implementa: Buscar paciente (Hashing)
             buscarPacientePorDNI();
             break;
         case 2:
-            // Implementa: Cancelar cita (Actualizar agenda y reasignar)
             cancelarCita();
             break;
         case 3:
-            // Implementa: Modificar disponibilidad (Actualizar estado del médico)
             modificarDisponibilidadMedico();
             break;
         case 4:
             cout << "\n--- LISTA DE CITAS PROGRAMADAS ---" << endl;
-            for (const auto &cita : citasProgramadas)
+            for (const auto& cita : citasProgramadas)
             {
                 string estado = cita.cancelada ? "CANCELADA" : "ACTIVA";
                 cout << std::left << setw(5) << "ID:" << setw(5) << cita.idCita
-                     << setw(15) << "Medico:" << setw(20) << cita.nombreMedico
-                     << setw(12) << "Fecha:" << setw(12) << cita.fecha
-                     << setw(10) << "Hora:" << setw(6) << cita.hora
-                     << setw(15) << "Prioridad:" << setw(3) << cita.prioridad
-                     << setw(10) << "Estado:" << estado << endl;
+                    << setw(15) << "Medico:" << setw(20) << cita.nombreMedico
+                    << setw(12) << "Fecha:" << setw(12) << cita.fecha
+                    << setw(10) << "Hora:" << setw(6) << cita.hora
+                    << setw(15) << "Prioridad:" << setw(3) << cita.prioridad
+                    << setw(10) << "Estado:" << estado << endl;
             }
             break;
         case 5:
             optimizarRutaAmbulancia();
             break;
+        case 6:
+            gestorRecursos.registrarPacienteCriticoInteractivo();
+            break;
+        case 7:
+            gestorRecursos.asignarRecursosGreedy();
+            break;
+        case 8:
+            gestorRecursos.darAltaPacientesInteractivo();
+            break;
+        case 9:
+            gestorRecursos.reporteRecursos();
+            break;
+        case 10:
+            gestorRecursos.reabastecerMedicamentoInteractivo();
+            break;
         case 0:
-            cout << "\nSaliendo del Modulo de Gestion de Citas." << endl;
+            cout << "\nSaliendo del Modulo de Gestion de Citas y Recursos." << endl;
             break;
         default:
             cout << "\n[ERROR] Opcion no valida. Intente de nuevo." << endl;
